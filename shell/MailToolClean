@@ -1,0 +1,47 @@
+#!/bin/sh
+### deleteMail.sh -- 彻底删除网易企业邮箱中已删除目录的邮件，彻底清空邮箱
+###
+### Usage:
+###   在该脚本同级目录建立cookie.log 文件存放cookie, 格式为:   Cookie: xxxx
+###   deleteMail.sh <batch_size>
+###
+### Options:
+###   batch_size: 每批次删除邮件数
+
+help(){
+  sed -rn 's/^### ?//;T;p' "$0"
+}
+
+cookie=$(cat cookie.log)
+batch_size=$1
+sid=$( cat cookie.log|awk -F 'Coremail.sid=' '{print $2}')
+
+delete(){
+curl -H "$cookie" -H "Content-Type: application/x-www-form-urlencoded" --data "var=%3C%3Fxml%20version%3D%221.0%22%3F%3E%3Cobject%3E%3Cint%20name%3D%22fid%22%3E4%3C%2Fint%3E%3Cstring%20name
+%3D%22order%22%3Edate%3C%2Fstring%3E%3Cboolean%20name%3D%22desc%22%3Etrue%3C%2Fboolean%3E%3Cint%20name%3D%22limit%22%3E$batch_size%3C%2Fint%3E%3Cint%20name%3D%22start%22%3E0%3C%2Fint%3E%3Cb
+oolean%20name%3D%22skipLockedFolders%22%3Efalse%3C%2Fboolean%3E%3Cboolean%20name%3D%22returnTag%22%3Etrue%3C%2Fboolean%3E%3Cboolean%20name%3D%22returnTotal%22%3Etrue%3C%2Fboolean%3E%3C%2Fob
+ject%3E" https://mail.qiye.163.com/js6/s\?sid\=$sid\&func\=mbox:listMessages |grep "name=\"id\"" >respon.log
+
+if (( $(cat respon.log|wc -l) == 0 ))
+then
+  echo "mail done"
+  exit 0
+fi
+
+sed -i 's/ name=\"id\"//g' respon.log
+echo "</array></object>" >> respon.log
+sed -i '1i\var=<?xml version=\"1.0\"?><object><array name=\"ids\">' respon.log
+request=$(cat respon.log)
+curl -H "$cookie" -H "Content-Type: application/x-www-form-urlencoded" --data "$request" https://mail.qiye.163.com/js6/s\?sid\=$sid\&func\=mbox:deleteMessages\&mbox_toolbar_allornone\=1\&mb
+ox_toolbar_permanentdeleted\=1
+}
+
+if (( $# ==0 )) || (( "$1" == "-h" ));then
+  help
+  exit 1
+fi
+
+while true
+do
+delete
+done
